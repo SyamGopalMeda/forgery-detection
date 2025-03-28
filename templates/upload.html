@@ -7,10 +7,6 @@
         .upload-box { border: 2px dashed #ccc; padding: 40px; text-align: center; margin: 30px 0; }
         .error { color: red; margin-bottom: 20px; }
         button { background: #4285f4; color: white; border: none; padding: 10px 20px; cursor: pointer; }
-        .recent-results { margin-top: 40px; }
-        .recent-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; }
-        .recent-item img { width: 100%; height: 120px; object-fit: cover; }
-        .section-title { margin: 30px 0 15px 0; border-bottom: 1px solid #eee; padding-bottom: 10px; }
     </style>
 </head>
 <body>
@@ -25,18 +21,5 @@
         </div>
         <button type="submit">Analyze Image</button>
     </form>
-
-    <div class="recent-results">
-        <h3 class="section-title">Recent Results</h3>
-        <div class="recent-grid">
-            {% for result in recent_results %}
-            <div class="recent-item">
-                <a href="/result/{{ result }}">
-                    <img src="/results/{{ result }}" alt="Recent result">
-                </a>
-            </div>
-            {% endfor %}
-        </div>
-    </div>
 </body>
 </html>
