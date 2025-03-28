@@ -1,0 +1,17 @@
+# Core Requirements
+flask==2.3.2
+torch==2.0.1
+torchvision==0.15.2
+pillow==10.0.0
+numpy==1.24.3
+tqdm==4.65.0
+
+# Additional Computer Vision
+opencv-python==4.7.0.72
+
+# Development & Testing (optional)
+python-dotenv==1.0.0
+gunicorn==20.1.0  # For production deployment
+
+# Documentation (optional)
+flask-sphinx==0.2.1
