@@ -6,9 +6,12 @@ import glob
 from PIL import Image
 
 app = Flask(__name__)
-app.config['UPLOAD_FOLDER'] = 'static/uploads'
-app.config['RESULT_FOLDER'] = 'static/results'
+
+# Configuration for both local and Render deployment
+app.config['UPLOAD_FOLDER'] = os.path.join('static', 'uploads')
+app.config['RESULT_FOLDER'] = os.path.join('static', 'results')
 app.config['ALLOWED_EXTENSIONS'] = {'png', 'jpg', 'jpeg', 'gif'}
+app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB file size limit
 
 def allowed_file(filename):
     return '.' in filename and \
@@ -18,13 +21,16 @@ def clean_old_files():
     """Remove files older than 7 days"""
     now = datetime.now()
     for folder in [app.config['UPLOAD_FOLDER'], app.config['RESULT_FOLDER']]:
-        if os.path.exists(folder):  # Check if folder exists
+        if os.path.exists(folder):
             for filename in os.listdir(folder):
                 file_path = os.path.join(folder, filename)
                 if os.path.isfile(file_path):
                     file_time = datetime.fromtimestamp(os.path.getctime(file_path))
                     if (now - file_time).days > 7:
-                        os.remove(file_path)
+                        try:
+                            os.remove(file_path)
+                        except Exception as e:
+                            print(f"Error deleting {file_path}: {e}")
 
 @app.route('/', methods=['GET', 'POST'])
 def upload_file():
@@ -46,25 +52,30 @@ def upload_file():
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             original_filename = f"original_{timestamp}_{file.filename}"
             original_path = os.path.join(app.config['UPLOAD_FOLDER'], original_filename)
-            file.save(original_path)
             
-            # Process image - ensure PNG output
-            base_name = os.path.splitext(file.filename)[0]
-            result_filename = f"result_{timestamp}_{base_name}.png"  # Force PNG extension
-            result_path = os.path.join(app.config['RESULT_FOLDER'], result_filename)
+            try:
+                file.save(original_path)
+                
+                # Process image - ensure PNG output
+                base_name = os.path.splitext(file.filename)[0]
+                result_filename = f"result_{timestamp}_{base_name}.png"
+                result_path = os.path.join(app.config['RESULT_FOLDER'], result_filename)
+                
+                # Process the image
+                detect_forgery(original_path, result_path)
+                
+                # Generate URLs for template
+                original_url = url_for('static', filename=f'uploads/{original_filename}')
+                result_url = url_for('static', filename=f'results/{result_filename}')
+                
+                return render_template('result.html', 
+                                    original=original_url,
+                                    original_filename=original_filename,
+                                    result=result_url,
+                                    result_filename=result_filename)
             
-            # Convert and save properly
-            detect_forgery(original_path, result_path)
-            
-            # Generate URLs for template
-            original_url = url_for('static', filename=f'uploads/{original_filename}')
-            result_url = url_for('static', filename=f'results/{result_filename}')
-            
-            return render_template('result.html', 
-                                original=original_url,
-                                original_filename=original_filename,
-                                result=result_url,
-                                result_filename=result_filename)
+            except Exception as e:
+                return render_template('upload.html', error=f"Processing error: {str(e)}")
     
     return render_template('upload.html')
 
@@ -76,7 +87,15 @@ def serve_result(filename):
 def serve_upload(filename):
     return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
 
+@app.route('/health')
+def health_check():
+    return "OK", 200
+
 if __name__ == '__main__':
+    # Create required directories
     os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
     os.makedirs(app.config['RESULT_FOLDER'], exist_ok=True)
-    app.run(debug=True)
+    
+    # Run the app (with Render-compatible settings)
+    port = int(os.environ.get('PORT', 5000))
+    app.run(host='0.0.0.0', port=port)
