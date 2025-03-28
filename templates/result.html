@@ -6,7 +6,7 @@
         body { font-family: Arial, sans-serif; max-width: 1200px; margin: 0 auto; padding: 20px; }
         .result-container { display: flex; justify-content: space-around; margin: 30px 0; }
         .image-box { width: 45%; text-align: center; }
-        img { max-width: 100%; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
+        img { max-width: 100%; max-height: 500px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
         h3 { margin-bottom: 20px; }
         .actions { display: flex; justify-content: space-between; margin-top: 30px; }
         a { color: #4285f4; text-decoration: none; padding: 8px 15px; border: 1px solid #4285f4; border-radius: 4px; }
@@ -18,24 +18,24 @@
     <h1>Forgery Detection Result</h1>
     
     <div class="file-info">
-        <p>Original: {{ original.split('/')[-1] }}</p>
-        <p>Processed: {{ result.split('/')[-1] }}</p>
+        <p>Original: {{ original_filename }}</p>
+        <p>Processed: {{ result_filename }}</p>
     </div>
     
     <div class="result-container">
         <div class="image-box">
             <h3>Original Image</h3>
-            <img src="{{ original }}" alt="Original Image">
+            <img src="data:image/png;base64,{{ original }}" alt="Original Image">
         </div>
         <div class="image-box">
             <h3>Detection Result</h3>
-            <img src="{{ result }}" alt="Forgery Detection">
+            <img src="data:image/png;base64,{{ result }}" alt="Forgery Detection">
         </div>
     </div>
     
     <div class="actions">
         <a href="/">← Analyze Another Image</a>
-        <a href="/results/{{ result.split('/')[-1] }}" download>Download Result</a>
+        <a href="/download?img={{ result }}&filename={{ result_filename }}">Download Result</a>
     </div>
 </body>
 </html>
