@@ -1,17 +1,18 @@
 # Core Requirements
 flask==2.3.2
-torch==2.0.1
-torchvision==0.15.2
-pillow==10.0.0
-numpy==1.24.3
-tqdm==4.65.0
+torch==2.1.2
+torchvision==0.16.2
+pillow==10.1.0
+numpy==1.26.3
+tqdm==4.66.1
 
 # Additional Computer Vision
-opencv-python==4.7.0.72
+opencv-python==4.8.1.78
 
 # Development & Testing (optional)
 python-dotenv==1.0.0
-gunicorn==20.1.0  # For production deployment
+gunicorn==21.2.0  # Updated version that supports Python 3.11
 
-# Documentation (optional)
-flask-sphinx==0.2.1
+# Documentation alternatives (flask-sphinx is deprecated)
+sphinx==7.2.6
+sphinx-rtd-theme==1.3.0
