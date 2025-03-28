@@ -1,41 +1,21 @@
-from flask import Flask, request, render_template, send_from_directory, url_for
-import os
-from detect import detect_forgery
-from datetime import datetime
-import glob
+from flask import Flask, request, render_template, send_file, make_response
+from io import BytesIO
 from PIL import Image
+import base64
+from detect import detect_forgery
 
 app = Flask(__name__)
 
-# Configuration for both local and Render deployment
-app.config['UPLOAD_FOLDER'] = os.path.join('static', 'uploads')
-app.config['RESULT_FOLDER'] = os.path.join('static', 'results')
+# Configuration
 app.config['ALLOWED_EXTENSIONS'] = {'png', 'jpg', 'jpeg', 'gif'}
-app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB file size limit
+app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB
 
 def allowed_file(filename):
     return '.' in filename and \
            filename.rsplit('.', 1)[1].lower() in app.config['ALLOWED_EXTENSIONS']
 
-def clean_old_files():
-    """Remove files older than 7 days"""
-    now = datetime.now()
-    for folder in [app.config['UPLOAD_FOLDER'], app.config['RESULT_FOLDER']]:
-        if os.path.exists(folder):
-            for filename in os.listdir(folder):
-                file_path = os.path.join(folder, filename)
-                if os.path.isfile(file_path):
-                    file_time = datetime.fromtimestamp(os.path.getctime(file_path))
-                    if (now - file_time).days > 7:
-                        try:
-                            os.remove(file_path)
-                        except Exception as e:
-                            print(f"Error deleting {file_path}: {e}")
-
 @app.route('/', methods=['GET', 'POST'])
 def upload_file():
-    clean_old_files()  # Clean old files on each request
-    
     if request.method == 'POST':
         if 'file' not in request.files:
             return render_template('upload.html', error="No file selected")
@@ -45,57 +25,45 @@ def upload_file():
             return render_template('upload.html', error="No file selected")
         
         if file and allowed_file(file.filename):
-            os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
-            os.makedirs(app.config['RESULT_FOLDER'], exist_ok=True)
-            
-            # Save original with timestamp
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            original_filename = f"original_{timestamp}_{file.filename}"
-            original_path = os.path.join(app.config['UPLOAD_FOLDER'], original_filename)
-            
             try:
-                file.save(original_path)
+                # Process the image directly
+                img = Image.open(file.stream)
+                result_img = detect_forgery(img)
                 
-                # Process image - ensure PNG output
-                base_name = os.path.splitext(file.filename)[0]
-                result_filename = f"result_{timestamp}_{base_name}.png"
-                result_path = os.path.join(app.config['RESULT_FOLDER'], result_filename)
+                # Convert to bytes
+                img_bytes = BytesIO()
+                img.save(img_bytes, format='PNG')
+                img_bytes.seek(0)
                 
-                # Process the image
-                detect_forgery(original_path, result_path)
+                result_bytes = BytesIO()
+                result_img.save(result_bytes, format='PNG')
+                result_bytes.seek(0)
                 
-                # Generate URLs for template
-                original_url = url_for('static', filename=f'uploads/{original_filename}')
-                result_url = url_for('static', filename=f'results/{result_filename}')
+                # Create base64 strings for display
+                original_b64 = base64.b64encode(img_bytes.getvalue()).decode('utf-8')
+                result_b64 = base64.b64encode(result_bytes.getvalue()).decode('utf-8')
                 
-                return render_template('result.html', 
-                                    original=original_url,
-                                    original_filename=original_filename,
-                                    result=result_url,
-                                    result_filename=result_filename)
+                return render_template('result.html',
+                                    original=original_b64,
+                                    result=result_b64,
+                                    original_filename=file.filename,
+                                    result_filename=f"result_{file.filename}")
             
             except Exception as e:
-                return render_template('upload.html', error=f"Processing error: {str(e)}")
+                return render_template('upload.html', error=f"Error: {str(e)}")
     
     return render_template('upload.html')
 
-@app.route('/results/<filename>')
-def serve_result(filename):
-    return send_from_directory(app.config['RESULT_FOLDER'], filename)
-
-@app.route('/uploads/<filename>')
-def serve_upload(filename):
-    return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
-
-@app.route('/health')
-def health_check():
-    return "OK", 200
+@app.route('/download')
+def download():
+    img_base64 = request.args.get('img')
+    filename = request.args.get('filename', 'result.png')
+    img_bytes = base64.b64decode(img_base64)
+    
+    response = make_response(img_bytes)
+    response.headers.set('Content-Type', 'image/png')
+    response.headers.set('Content-Disposition', 'attachment', filename=filename)
+    return response
 
 if __name__ == '__main__':
-    # Create required directories
-    os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
-    os.makedirs(app.config['RESULT_FOLDER'], exist_ok=True)
-    
-    # Run the app (with Render-compatible settings)
-    port = int(os.environ.get('PORT', 5000))
-    app.run(host='0.0.0.0', port=port)
+    app.run(host='0.0.0.0', port=5000)
